@@ -140,16 +140,114 @@ const fetchUrlsFromDocument = async (req, res) => {
       }
     }, []);
 
-    res
-      .status(200)
-      .send({
-        message: "URLs fetched successfully",
-        data: uniqueUrlsWithIndex,
-      });
+    res.status(200).send({
+      message: "URLs fetched successfully",
+      data: uniqueUrlsWithIndex,
+    });
   } catch (error) {
     res
       .status(500)
       .send({ message: "Error fetching URLs", error: error.message });
+  }
+};
+
+// Fetch packets by source IP address within a specific document
+const fetchPacketsBySourceIP = async (req, res) => {
+  try {
+    const { id, src } = req.query;
+
+    if (!id || !src) {
+      return res
+        .status(400)
+        .send({ message: "Invalid ID or source IP provided" });
+    }
+
+    const packetDoc = await Packet.findById(id);
+
+    if (!packetDoc) {
+      return res.status(404).send({ message: "Packet not found" });
+    }
+
+    const packets = packetDoc.packets.filter((packet) => {
+      return (
+        packet.details && packet.details.IP && packet.details.IP.src === src
+      );
+    });
+
+    res
+      .status(200)
+      .send({ message: "Packets fetched successfully", data: packets });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ message: "Error fetching packets", error: error.message });
+  }
+};
+
+// Fetch URLs by source IP address within a specific document
+const fetchUrlsBySourceIP = async (req, res) => {
+  try {
+    const { id, src } = req.query;
+
+    if (!id || !src) {
+      return res
+        .status(400)
+        .send({ message: "Invalid ID or source IP provided" });
+    }
+
+    const packetDoc = await Packet.findById(id);
+
+    if (!packetDoc) {
+      return res.status(404).send({ message: "Packet not found" });
+    }
+
+    const urlRegex = /(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}/g;
+    const urls = [];
+
+    packetDoc.packets.forEach((packet, index) => {
+      if (
+        packet.details &&
+        packet.details.IP &&
+        packet.details.IP.src === src
+      ) {
+        if (packet.info) {
+          const urlsInInfo = packet.info.match(urlRegex);
+          if (urlsInInfo) {
+            urlsInInfo.forEach((url) => {
+              urls.push({
+                url,
+                objectId: index,
+                arrivalTime: packet.arrival_time,
+              });
+            });
+          }
+        }
+      }
+    });
+
+    res.status(200).send({ message: "URLs fetched successfully", data: urls });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ message: "Error fetching URLs", error: error.message });
+  }
+};
+
+// Fetch all document IDs
+const fetchAllDocumentIds = async (req, res) => {
+  try {
+    const documents = await Packet.find({}, { _id: 1 }).exec();
+
+    const documentIds = documents.map((doc) => doc._id);
+
+    res.status(200).send({
+      message: "Document IDs fetched successfully",
+      data: documentIds,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ message: "Error fetching document IDs", error: error.message });
   }
 };
 
@@ -158,4 +256,7 @@ module.exports = {
   fetchSpecificObject,
   fetchPacketsInRange,
   fetchUrlsFromDocument,
+  fetchPacketsBySourceIP,
+  fetchUrlsBySourceIP,
+  fetchAllDocumentIds,
 };

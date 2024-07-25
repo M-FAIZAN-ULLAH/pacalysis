@@ -1,5 +1,20 @@
 import React, { useState } from "react";
-import { Upload, Button, notification, Spin, Modal, Table, Input } from "antd";
+import {
+  Upload,
+  Button,
+  notification,
+  Spin,
+  Modal,
+  Table,
+  Input,
+  Descriptions,
+  Collapse,
+  Typography,
+  Divider,
+  Card,
+  Form,
+  message,
+} from "antd";
 import {
   UploadOutlined,
   EyeOutlined,
@@ -19,6 +34,8 @@ const PcapUpload = () => {
   const [urlModalVisible, setUrlModalVisible] = useState(false);
   const [urls, setUrls] = useState([]);
   const [ipFilter, setIpFilter] = useState("");
+  const { Panel } = Collapse;
+  const { Title, Paragraph, Text } = Typography;
 
   const handleUpload = ({ file }) => {
     if (
@@ -37,7 +54,7 @@ const PcapUpload = () => {
   const handleView = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/packets/range?id=669a34f8867bc7f321fddbd0&start=58&end=75"
+        "http://localhost:5000/api/packets/range?id=669a34f8867bc7f321fddbd0&start=58&end=70"
       );
       setTableData(response.data.data);
       setFilteredData(response.data.data);
@@ -88,11 +105,84 @@ const PcapUpload = () => {
     Modal.info({
       title: "Detailed Information",
       content: (
-        <pre style={{ whiteSpace: "pre-wrap", wordWrap: "break-word" }}>
-          {JSON.stringify(record, null, 2)}
-        </pre>
+        <div style={{ width: 1000, maxHeight: "600px", overflowY: "auto" }}>
+          <Collapse defaultActiveKey={["1"]} bordered={false}>
+            <Collapse.Panel header="General Information" key="1">
+              <Descriptions column={2} bordered>
+                <Descriptions.Item label="Time">
+                  {record.time}
+                </Descriptions.Item>
+                <Descriptions.Item label="Arrival Time">
+                  {record.arrival_time}
+                </Descriptions.Item>
+                <Descriptions.Item label="UTC Arrival Time">
+                  {record.UTC_arrival_time}
+                </Descriptions.Item>
+                <Descriptions.Item label="Frame Number">
+                  {record.frame_number || "N/A"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Protocol in Frame">
+                  {record.protocol_in_frame}
+                </Descriptions.Item>
+                <Descriptions.Item label="Coloring Rule Name">
+                  {record.coloring_rule_name || "N/A"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Coloring Rule Strength">
+                  {record.coloring_rule_strength || "N/A"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Source">
+                  {record.source}
+                </Descriptions.Item>
+                <Descriptions.Item label="Destination">
+                  {record.destination}
+                </Descriptions.Item>
+                <Descriptions.Item label="Source Port">
+                  {record.source_port}
+                </Descriptions.Item>
+                <Descriptions.Item label="Destination Port">
+                  {record.destination_port}
+                </Descriptions.Item>
+                <Descriptions.Item label="Length">
+                  {record.length}
+                </Descriptions.Item>
+                <Descriptions.Item label="Info">
+                  {record.info}
+                </Descriptions.Item>
+              </Descriptions>
+            </Collapse.Panel>
+            <Collapse.Panel header="Ethernet Details" key="2">
+              <Descriptions column={2} bordered>
+                <Descriptions.Item label="Destination">
+                  {record.ethernet.dst}
+                </Descriptions.Item>
+                <Descriptions.Item label="Source">
+                  {record.ethernet.src}
+                </Descriptions.Item>
+                <Descriptions.Item label="Type">
+                  {record.ethernet.type}
+                </Descriptions.Item>
+              </Descriptions>
+            </Collapse.Panel>
+            <Collapse.Panel header="Additional Details" key="3">
+              <Collapse>
+                {Object.entries(record.details).map(([protocol, details]) => (
+                  <Collapse.Panel header={protocol} key={protocol}>
+                    <Descriptions column={2} bordered>
+                      {Object.entries(details).map(([key, value]) => (
+                        <Descriptions.Item label={key} key={key}>
+                          {value !== null ? value.toString() : "N/A"}
+                        </Descriptions.Item>
+                      ))}
+                    </Descriptions>
+                  </Collapse.Panel>
+                ))}
+              </Collapse>
+            </Collapse.Panel>
+          </Collapse>
+        </div>
       ),
-      onOk() {},
+      width: 1100,
+      bodyStyle: { padding: "20px" }, // Add padding inside the modal
     });
   };
 
@@ -201,6 +291,49 @@ const PcapUpload = () => {
     },
   ];
 
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [data, setData] = useState([]);
+  const [aloading, setaLoading] = useState(false);
+  const [index, setIndex] = useState("");
+  const [showData, setShowData] = useState(false);
+
+  const fetchData = async (index) => {
+    setaLoading(true);
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/api/packets/object?id=669a34f8867bc7f321fddbd0&index=${index}`
+      );
+      setData(response.data);
+      setShowData(true);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      message.error("Failed to fetch data");
+    } finally {
+      setaLoading(false);
+    }
+  };
+
+  const handleIndexSubmit = async () => {
+    if (!index) {
+      message.error("Please enter an index");
+      return;
+    }
+    await fetchData(index);
+    setIsModalVisible(true);
+  };
+
+  const handleOk = () => {
+    setIsModalVisible(false);
+    setIndex("");
+    setShowData(false);
+  };
+
+  const handleCancel = () => {
+    setIsModalVisible(false);
+    setIndex("");
+    setShowData(false);
+  };
+
   return (
     <div>
       <Upload.Dragger
@@ -290,8 +423,147 @@ const PcapUpload = () => {
             onChange={handleIpFilterChange}
             style={{ width: 200, marginLeft: 16 }}
           />
+          <Button
+            type="default"
+            style={{ marginLeft: 16 }}
+            onClick={() => setIsModalVisible(true)}
+          >
+            Find Object
+          </Button>
         </div>
       </div>
+      <Modal
+        title="Object Description"
+        visible={isModalVisible}
+        onOk={handleOk}
+        onCancel={handleCancel}
+        footer={null}
+        width={800}
+      >
+        {!showData ? (
+          <Form layout="inline" onFinish={handleIndexSubmit}>
+            <Form.Item>
+              <Input
+                placeholder="Enter index"
+                value={index}
+                onChange={(e) => setIndex(e.target.value)}
+              />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">
+                Submit
+              </Button>
+            </Form.Item>
+          </Form>
+        ) : aloading ? (
+          <div style={{ textAlign: "center" }}>
+            <Spin size="large" />
+          </div>
+        ) : (
+          data && (
+            <Descriptions bordered column={1}>
+              <Descriptions.Item label="Message">
+                {data.message}
+              </Descriptions.Item>
+              <Descriptions.Item label="Time">
+                {data.data.time}
+              </Descriptions.Item>
+              <Descriptions.Item label="Arrival Time">
+                {data.data.arrival_time}
+              </Descriptions.Item>
+              <Descriptions.Item label="UTC Arrival Time">
+                {data.data.UTC_arrival_time}
+              </Descriptions.Item>
+              <Descriptions.Item label="Frame Number">
+                {data.data.frame_number}
+              </Descriptions.Item>
+              <Descriptions.Item label="Protocol in Frame">
+                {data.data.protocol_in_frame}
+              </Descriptions.Item>
+              <Descriptions.Item label="Coloring Rule Name">
+                {data.data.coloring_rule_name}
+              </Descriptions.Item>
+              <Descriptions.Item label="Coloring Rule Strength">
+                {data.data.coloring_rule_strength}
+              </Descriptions.Item>
+              <Descriptions.Item label="Source">
+                {data.data.source}
+              </Descriptions.Item>
+              <Descriptions.Item label="Destination">
+                {data.data.destination}
+              </Descriptions.Item>
+              <Descriptions.Item label="Source Port">
+                {data.data.source_port}
+              </Descriptions.Item>
+              <Descriptions.Item label="Destination Port">
+                {data.data.destination_port}
+              </Descriptions.Item>
+              <Descriptions.Item label="Length">
+                {data.data.length}
+              </Descriptions.Item>
+              <Descriptions.Item label="Info">
+                {data.data.info}
+              </Descriptions.Item>
+              <Descriptions.Item label="Frames">
+                {data.data.frames}
+              </Descriptions.Item>
+              <Descriptions.Item label="Bytes">
+                {data.data.bytes}
+              </Descriptions.Item>
+              <Descriptions.Item label="Header Checksum Status">
+                {data.data.header_checksum_status}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ethernet">
+                {data.data.ethernet ? (
+                  <Descriptions bordered column={1}>
+                    <Descriptions.Item label="Destination">
+                      {data.data.ethernet.dst}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Source">
+                      {data.data.ethernet.src}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Type">
+                      {data.data.ethernet.type}
+                    </Descriptions.Item>
+                  </Descriptions>
+                ) : (
+                  "No data"
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="Queries">
+                {data.data.queries}
+              </Descriptions.Item>
+              <Descriptions.Item label="Answers">
+                {data.data.answers}
+              </Descriptions.Item>
+              <Descriptions.Item label="Flags">
+                {data.data.flags}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ports">
+                {data.data.ports}
+              </Descriptions.Item>
+              <Descriptions.Item label="Details">
+                {data.data.details ? (
+                  <Descriptions bordered column={1}>
+                    {Object.entries(data.data.details).map(([key, value]) => (
+                      <Descriptions.Item key={key} label={key}>
+                        {Object.entries(value).map(([subKey, subValue]) => (
+                          <div key={subKey}>
+                            {subKey}: {subValue}
+                          </div>
+                        ))}
+                      </Descriptions.Item>
+                    ))}
+                  </Descriptions>
+                ) : (
+                  "No data"
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="ID">{data.data._id}</Descriptions.Item>
+            </Descriptions>
+          )
+        )}
+      </Modal>
 
       <Table
         dataSource={filteredData}
